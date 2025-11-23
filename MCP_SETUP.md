@@ -15,7 +15,7 @@
 4. Configure:
    - Name: `nuvei-mcp`
    - Transport: `SSE`
-   - URL: `http://nuvei-mcp-prod.eastus.azurecontainer.io:8000/sse`
+   - URL: `http://nuvei-mcp-staging.eastus.azurecontainer.io:8000/sse`
 
 ### Option 2: Through Cursor MCP Config File
 1. Edit the MCP configuration file at `~/.cursor/mcp.json`
@@ -27,7 +27,7 @@
     {
       "name": "nuvei-mcp",
       "type": "streamableHttp",
-      "url": "http://nuvei-mcp-prod.eastus.azurecontainer.io:8000/sse"
+      "url": "http://nuvei-mcp-staging.eastus.azurecontainer.io:8000/sse"
     }
   ]
 }
@@ -40,7 +40,7 @@
   "mcpServers": {
     "nuvei-mcp": {
       "transport": "sse",
-      "url": "http://nuvei-mcp-prod.eastus.azurecontainer.io:8000/sse"
+      "url": "http://nuvei-mcp-staging.eastus.azurecontainer.io:8000/sse"
     }
   }
 }

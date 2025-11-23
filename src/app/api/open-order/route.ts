@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
       secretKey
     );
 
+    const resolvedUserTokenId = userTokenId || "SDKtest";
+
     const payload: any = {
       merchantId,
       merchantSiteId,
@@ -40,13 +42,10 @@ export async function POST(req: NextRequest) {
       amount,
       timeStamp,
       checksum,
+      userTokenId: resolvedUserTokenId,
     };
 
     // Add optional fields
-    if (userTokenId) {
-      payload.userTokenId = userTokenId;
-    }
-    
     // Add notification URL for DMN webhooks
     if (notificationUrl) {
       payload.urlDetails = {
