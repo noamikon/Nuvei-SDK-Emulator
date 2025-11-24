@@ -2173,6 +2173,54 @@ export default function Home() {
         const apmSessionToken = openOrderData.sessionToken;
         const orderId = openOrderData.orderId;
 
+        // Step 1.5: Check if currency needs to be updated
+        const openOrderCurrency = currency; // The currency used in openOrder
+
+        // Determine the required currency from the APM
+        let selectedCurrency = currency; // Default to the currency from flow params
+
+        // Check if APM has currency restrictions
+        if (selectedApmObj.currencies && selectedApmObj.currencies.length > 0) {
+          // If APM only supports specific currencies, use the first one
+          selectedCurrency = selectedApmObj.currencies[0];
+          setLogs((prev) => [...prev, `APM ${selectedApm} supports currencies: ${selectedApmObj.currencies.join(', ')}`]);
+          setLogs((prev) => [...prev, `Using currency: ${selectedCurrency}`]);
+        }
+
+        if (openOrderCurrency !== selectedCurrency) {
+          setLogs((prev) => [...prev, `=== Step 1.5: Currency mismatch detected ===`]);
+          setLogs((prev) => [...prev, `openOrder currency: ${openOrderCurrency}, Required currency: ${selectedCurrency}`]);
+          setLogs((prev) => [...prev, `Calling updateOrder to update currency...`]);
+
+          const updateOrderPayload: any = {
+            merchantId,
+            merchantSiteId,
+            secretKey,
+            sessionToken: apmSessionToken,
+            orderId,
+            currency: selectedCurrency,
+            amount, // Keep the same amount
+            clientRequestId: `${Date.now()}`,
+          };
+
+          const updateOrderResponse = await fetch('/api/update-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateOrderPayload),
+          });
+
+          const updateOrderData = await updateOrderResponse.json();
+          setLogs((prev) => [...prev, `updateOrder response:`, updateOrderData]);
+
+          if (!updateOrderData.ok || updateOrderData.response?.status !== 'SUCCESS') {
+            throw new Error(updateOrderData.error || updateOrderData.response?.reason || 'Failed to update order currency');
+          }
+
+          setLogs((prev) => [...prev, `✓ Currency updated to ${selectedCurrency}`]);
+        } else {
+          setLogs((prev) => [...prev, `Currency matches (${selectedCurrency}), proceeding without updateOrder...`]);
+        }
+
         setLogs((prev) => [...prev, '=== Step 2: Calling createPayment() with APM ===']);
         setLogs((prev) => [...prev, `Using sessionToken: ${apmSessionToken.substring(0, 20)}...`]);
         setLogs((prev) => [...prev, `Using orderId: ${orderId}`]);
@@ -2216,6 +2264,8 @@ export default function Home() {
           deviceDetails: {
             ipAddress: flowParams.ipAddress,
           },
+          amount,
+          currency: selectedCurrency, // Use the currency from APM or updateOrder
         };
 
         setLogs((prev) => [...prev, `createPayment payload: ${JSON.stringify(createPaymentPayload, null, 2)}`]);

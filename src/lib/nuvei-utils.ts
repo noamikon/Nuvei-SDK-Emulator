@@ -49,6 +49,22 @@ export function calculateOpenOrderChecksum(
 }
 
 /**
+ * Calculate checksum for updateOrder
+ * Format: merchantId + merchantSiteId + clientRequestId + currency + timeStamp + secretKey
+ */
+export function calculateUpdateOrderChecksum(
+  merchantId: string,
+  merchantSiteId: string,
+  clientRequestId: string,
+  currency: string,
+  timeStamp: string,
+  secretKey: string
+): string {
+  const toHash = merchantId + merchantSiteId + clientRequestId + currency + timeStamp + secretKey;
+  return crypto.createHash('sha256').update(toHash).digest('hex');
+}
+
+/**
  * Calculate checksum for payment methods
  * The exact format depends on the API method - this is a general one
  */
