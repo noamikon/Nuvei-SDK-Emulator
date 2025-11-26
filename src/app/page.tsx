@@ -477,6 +477,8 @@ const FLOWS: FlowDefinition[] = [
     name: "APM Deposit",
     description: "Process a payment using Alternative Payment Methods",
     requiredFields: [
+      { id: "amount", label: "Amount", type: "number", placeholder: "100" },
+      { id: "currency", label: "Currency", type: "select", placeholder: "USD" },
       { id: "userTokenId", label: "User Token ID", type: "text", placeholder: "SDKtest" }
     ]
   }
@@ -2146,7 +2148,7 @@ export default function Home() {
           merchantSiteId,
           secretKey,
           amount,
-          currency,
+          currency: "USD", // Always use USD for openOrder, will update via updateOrder if needed
           userTokenId: flowParams.userTokenId || "SDKtest",
           clientUniqueId: `APM_${Date.now()}`,
         };
@@ -2173,24 +2175,29 @@ export default function Home() {
         const apmSessionToken = openOrderData.sessionToken;
         const orderId = openOrderData.orderId;
 
-        // Step 1.5: Check if currency needs to be updated
-        const openOrderCurrency = currency; // The currency used in openOrder
+        // Step 1.5: Validate currency compatibility and update if needed
+        const openOrderCurrency = "USD"; // openOrder always uses USD by default
+        const selectedCurrency = currency; // Currency from the Currency field
 
-        // Determine the required currency from the APM
-        let selectedCurrency = currency; // Default to the currency from flow params
-
-        // Check if APM has currency restrictions
+        // Check if APM supports the selected currency
         if (selectedApmObj.currencies && selectedApmObj.currencies.length > 0) {
-          // If APM only supports specific currencies, use the first one
-          selectedCurrency = selectedApmObj.currencies[0];
-          setLogs((prev) => [...prev, `APM ${selectedApm} supports currencies: ${selectedApmObj.currencies.join(', ')}`]);
-          setLogs((prev) => [...prev, `Using currency: ${selectedCurrency}`]);
+          const supportedCurrencies = selectedApmObj.currencies;
+          setLogs((prev) => [...prev, `APM ${selectedApm} supports currencies: ${supportedCurrencies.join(', ')}`]);
+
+          if (!supportedCurrencies.includes(selectedCurrency)) {
+            const errorMsg = `Currency ${selectedCurrency} is not supported by ${selectedApm}. Supported currencies: ${supportedCurrencies.join(', ')}`;
+            setLogs((prev) => [...prev, `ERROR: ${errorMsg}`]);
+            throw new Error(errorMsg);
+          }
+
+          setLogs((prev) => [...prev, `✓ Currency ${selectedCurrency} is supported by this APM`]);
         }
 
+        // Check if we need to update the order currency
         if (openOrderCurrency !== selectedCurrency) {
-          setLogs((prev) => [...prev, `=== Step 1.5: Currency mismatch detected ===`]);
-          setLogs((prev) => [...prev, `openOrder currency: ${openOrderCurrency}, Required currency: ${selectedCurrency}`]);
-          setLogs((prev) => [...prev, `Calling updateOrder to update currency...`]);
+          setLogs((prev) => [...prev, `=== Step 1.5: Updating order currency ===`]);
+          setLogs((prev) => [...prev, `openOrder currency: ${openOrderCurrency}, Selected currency: ${selectedCurrency}`]);
+          setLogs((prev) => [...prev, `Calling updateOrder to change currency to ${selectedCurrency}...`]);
 
           const updateOrderPayload: any = {
             merchantId,
@@ -2199,7 +2206,7 @@ export default function Home() {
             sessionToken: apmSessionToken,
             orderId,
             currency: selectedCurrency,
-            amount, // Keep the same amount
+            amount,
             clientRequestId: `${Date.now()}`,
           };
 
@@ -2210,15 +2217,15 @@ export default function Home() {
           });
 
           const updateOrderData = await updateOrderResponse.json();
-          setLogs((prev) => [...prev, `updateOrder response:`, updateOrderData]);
+          setLogs((prev) => [...prev, 'updateOrder response:', updateOrderData]);
 
           if (!updateOrderData.ok || updateOrderData.response?.status !== 'SUCCESS') {
             throw new Error(updateOrderData.error || updateOrderData.response?.reason || 'Failed to update order currency');
           }
 
-          setLogs((prev) => [...prev, `✓ Currency updated to ${selectedCurrency}`]);
+          setLogs((prev) => [...prev, `✓ Order currency updated to ${selectedCurrency}`]);
         } else {
-          setLogs((prev) => [...prev, `Currency matches (${selectedCurrency}), proceeding without updateOrder...`]);
+          setLogs((prev) => [...prev, `Currency already matches (${selectedCurrency}), no update needed`]);
         }
 
         setLogs((prev) => [...prev, '=== Step 2: Calling createPayment() with APM ===']);
