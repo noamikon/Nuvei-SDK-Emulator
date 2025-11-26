@@ -8,11 +8,12 @@ const NUVEI_API_BASE_URL = process.env.NUVEI_API_URL || "https://ppp-test.safech
 
 export async function POST(req: NextRequest) {
     const body = await req.json();
-    const { merchantId, merchantSiteId, secretKey, sessionToken, orderId, currency, clientRequestId } = body;
+    const { merchantId, merchantSiteId, sessionToken, orderId, currency, clientRequestId, amount } = body;
+    const secretKey = req.headers.get('X-Secret-Key');
 
     if (!merchantId || !merchantSiteId || !secretKey || !sessionToken || !orderId || !currency) {
         return NextResponse.json(
-            { error: "Missing required fields: merchantId, merchantSiteId, secretKey, sessionToken, orderId, currency" },
+            { error: "Missing required fields: merchantId, merchantSiteId, secretKey (header), sessionToken, orderId, currency" },
             { status: 400 }
         );
     }

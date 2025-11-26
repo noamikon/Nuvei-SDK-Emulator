@@ -1007,11 +1007,13 @@ export default function Home() {
 
       const res = await fetch("/api/open-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Secret-Key": secretKey
+        },
         body: JSON.stringify({
           merchantId,
           merchantSiteId,
-          secretKey,
           amount,
           currency,
           userTokenId: flowParams.userTokenId || "SDKtest",
@@ -1494,11 +1496,13 @@ export default function Home() {
 
       const res = await fetch("/api/open-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Secret-Key": secretKey
+        },
         body: JSON.stringify({
           merchantId,
           merchantSiteId,
-          secretKey,
           amount,
           currency,
           userTokenId: flowParams.userTokenId || "SDKtest",
@@ -2146,7 +2150,6 @@ export default function Home() {
         const openOrderPayload: any = {
           merchantId,
           merchantSiteId,
-          secretKey,
           amount,
           currency: "USD", // Always use USD for openOrder, will update via updateOrder if needed
           userTokenId: flowParams.userTokenId || "SDKtest",
@@ -2161,7 +2164,10 @@ export default function Home() {
 
         const openOrderResponse = await fetch('/api/open-order', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Secret-Key': secretKey // Send secretKey via header, not in body
+          },
           body: JSON.stringify(openOrderPayload),
         });
 
@@ -2202,7 +2208,6 @@ export default function Home() {
           const updateOrderPayload: any = {
             merchantId,
             merchantSiteId,
-            secretKey,
             sessionToken: apmSessionToken,
             orderId,
             currency: selectedCurrency,
@@ -2212,7 +2217,10 @@ export default function Home() {
 
           const updateOrderResponse = await fetch('/api/update-order', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Secret-Key': secretKey // Send secretKey via header, not in body
+            },
             body: JSON.stringify(updateOrderPayload),
           });
 
@@ -2394,11 +2402,13 @@ export default function Home() {
 
     const res = await fetch("/api/run-flow", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Secret-Key": secretKey
+      },
       body: JSON.stringify({
         merchantId,
         merchantSiteId,
-        secretKey,
         flow: selectedFlow,
         flowParams,
         sessionToken: sessionToken

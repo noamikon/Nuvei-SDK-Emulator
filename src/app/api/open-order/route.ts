@@ -9,11 +9,12 @@ const NUVEI_API_BASE_URL = process.env.NUVEI_API_URL || "https://ppp-test.safech
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { merchantId, merchantSiteId, secretKey, amount, currency, clientUniqueId, userTokenId, notificationUrl } = body;
+  const { merchantId, merchantSiteId, amount, currency, clientUniqueId, userTokenId, notificationUrl } = body;
+  const secretKey = req.headers.get('X-Secret-Key');
 
   if (!merchantId || !merchantSiteId || !secretKey || !amount || !currency) {
     return NextResponse.json(
-      { error: "Missing required fields: merchantId, merchantSiteId, secretKey, amount, currency" },
+      { error: "Missing required fields: merchantId, merchantSiteId, secretKey (header), amount, currency" },
       { status: 400 }
     );
   }
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
         notificationUrl: notificationUrl
       };
     }
-    
+
     payload.transactionType = "Sale"; // Transaction type for all flows
 
     // Call Nuvei's openOrder API

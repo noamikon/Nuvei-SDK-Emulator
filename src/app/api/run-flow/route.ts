@@ -9,10 +9,11 @@ const NUVEI_API_BASE_URL = process.env.NUVEI_API_URL || "https://ppp-test.safech
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { merchantId, merchantSiteId, secretKey, flow, orderId, ccTempToken, amount, currency, sessionToken } = body;
+  const { merchantId, merchantSiteId, flow, orderId, ccTempToken, amount, currency, sessionToken } = body;
+  const secretKey = req.headers.get('X-Secret-Key');
 
   if (!merchantId || !merchantSiteId || !secretKey || !flow) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    return NextResponse.json({ error: "Missing required fields (including X-Secret-Key header)" }, { status: 400 });
   }
 
   /* Collect logs in an array so we can send to frontend */
@@ -41,19 +42,19 @@ export async function POST(req: NextRequest) {
 
         const clientRequestId = generateClientRequestId();
         const timeStamp = getCurrentTimestamp();
-        
+
         // Calculate checksum for payment API
         // Exact format: merchantId + merchantSiteId + amount + currency + timeStamp + merchantSecretKey
-        const checksumString = 
+        const checksumString =
           merchantId +
           merchantSiteId +
           amount +
           currency +
           timeStamp +
           secretKey;
-        
+
         const checksum = crypto.createHash('sha256').update(checksumString, 'utf8').digest('hex');
-        
+
         log(`Checksum format: merchantId + merchantSiteId + amount + currency + timeStamp + secretKey`);
         log(`Checksum string (excluding secretKey): ${merchantId + merchantSiteId + amount + currency + timeStamp}...`);
 
