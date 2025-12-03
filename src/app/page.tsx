@@ -898,6 +898,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [nightMode, setNightMode] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [completeFlowSessionToken, setCompleteFlowSessionToken] = useState<string | null>(null);
+  const [sdkSessionPending, setSdkSessionPending] = useState(false);
   const [nuveiFieldsReady, setNuveiFieldsReady] = useState(false);
   const [nuveiSdkLoaded, setNuveiSdkLoaded] = useState(false);
   const [nuveiInitError, setNuveiInitError] = useState<string | null>(null);
@@ -914,7 +916,6 @@ export default function Home() {
   const [sdkMethodParams, setSdkMethodParams] = useState<Record<string, string>>({});
   const [sdkMethodLoading, setSdkMethodLoading] = useState(false);
   const [sdkInstanceError, setSdkInstanceError] = useState<string | null>(null);
-  const [sdkSessionPending, setSdkSessionPending] = useState(false);
   const [sdkSessionStatus, setSdkSessionStatus] = useState<string | null>(null);
   const sdkInstanceRef = useRef<any>(null);
 
@@ -1242,7 +1243,68 @@ export default function Home() {
       console.log('Auto-initiating session with:', { merchantId, merchantSiteId, amount, currency, flow: selectedFlow });
       initiateSession();
     }
-  }, [selectedFlow, merchantId, merchantSiteId, secretKey, flowParams.amount, flowParams.currency, sessionToken, initiateSession]);
+  }, [selectedFlow, merchantId, merchantSiteId, secretKey, flowParams.amount, flowParams.currency, sessionToken, notificationUrl]);
+
+  // Refresh payment status using cached sessionToken
+  const refreshPaymentStatus = async () => {
+    if (!completeFlowSessionToken) {
+      alert('No completed flow session available to refresh');
+      return;
+    }
+
+    if (!merchantId || !merchantSiteId || !secretKey) {
+      alert('Missing merchant credentials');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setLogs((prev) => [...prev, '=== Refreshing Payment Status ===']);
+
+      const refreshResponse = await fetch('/api/get-payment-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Secret-Key': secretKey
+        },
+        body: JSON.stringify({
+          merchantId,
+          merchantSiteId,
+          sessionToken: completeFlowSessionToken,
+        }),
+      });
+
+      const refreshData = await refreshResponse.json();
+
+      if (!refreshData.ok) {
+        throw new Error(refreshData.error || 'Failed to refresh payment status');
+      }
+
+      setLogs((prev) => [...prev, 'Payment status refreshed successfully']);
+
+      // Update the summary in the response with fresh data from getPaymentStatus
+      if (response && response.summary) {
+        const updatedResponse = {
+          ...response,
+          summary: {
+            ...response.summary,
+            transactionStatus: refreshData.response.transactionStatus,
+            transactionId: refreshData.response.transactionId,
+            lastUpdated: new Date().toISOString(),
+            rawPaymentStatus: refreshData.response,
+          }
+        };
+        setResponse(updatedResponse);
+      }
+
+      setLoading(false);
+    } catch (error: any) {
+      setLoading(false);
+      const errorMsg = error?.message || 'Failed to refresh payment status';
+      setLogs((prev) => [...prev, `ERROR: ${errorMsg}`]);
+      alert(`Refresh failed:\n\n${errorMsg}`);
+    }
+  };
 
   // Fetch available APMs when APM Deposit is selected using Web SDK getApms()
   useEffect(() => {
@@ -2064,6 +2126,60 @@ export default function Home() {
 
         setResponse(combinedResult);
         setLogs((prev) => [...prev, '=== Flow Completed Successfully ===']);
+
+        // Cache sessionToken for Summary refresh functionality
+        if (sessionToken) {
+          setCompleteFlowSessionToken(sessionToken);
+
+          // Automatically fetch payment status to populate Summary
+          setLogs((prev) => [...prev, '=== Fetching Payment Status ===']);
+          try {
+            const statusResponse = await fetch('/api/get-payment-status', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Secret-Key': secretKey
+              },
+              body: JSON.stringify({
+                merchantId,
+                merchantSiteId,
+                sessionToken,
+              }),
+            });
+
+            const statusData = await statusResponse.json();
+
+            if (statusData.ok && statusData.response) {
+              setLogs((prev) => [...prev, 'Payment status retrieved successfully']);
+
+              // Update summary with payment status data
+              const enrichedResult = {
+                ...combinedResult,
+                summary: {
+                  ...combinedResult.summary,
+                  transactionStatus: statusData.response.transactionStatus,
+                  transactionType: statusData.response.transactionType,
+                  paymentStatusDetails: statusData.response,
+                }
+              };
+              setResponse(enrichedResult);
+            }
+          } catch (error: any) {
+            setLogs((prev) => [...prev, `Note: Could not fetch payment status: ${error.message}`]);
+            // Don't fail the entire flow if payment status fetch fails
+          }
+        }
+
+        // Auto-reset session for next flow run
+        setLogs((prev) => [...prev, '=== Preparing for next flow run ===']);
+        setLogs((prev) => [...prev, 'Getting new session token and reinitializing fields...']);
+
+        // Clear current session and trigger automatic reinitialization
+        setSessionToken(null);
+
+        // The useEffect will automatically call initiateSession() and reinitialize Nuvei Fields
+        // when sessionToken becomes null
+
       } catch (error: any) {
         setLoading(false);
         const errorMsg = error?.message || 'Payment failed';
@@ -2361,6 +2477,49 @@ export default function Home() {
 
         setResponse(combinedResult);
         setLogs((prev) => [...prev, '=== Flow Completed Successfully ===']);
+
+        // Cache sessionToken for Summary refresh functionality
+        if (apmSessionToken) {
+          setCompleteFlowSessionToken(apmSessionToken);
+
+          // Automatically fetch payment status to populate Summary
+          setLogs((prev) => [...prev, '=== Fetching Payment Status ===']);
+          try {
+            const statusResponse = await fetch('/api/get-payment-status', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Secret-Key': secretKey
+              },
+              body: JSON.stringify({
+                merchantId,
+                merchantSiteId,
+                sessionToken: apmSessionToken,
+              }),
+            });
+
+            const statusData = await statusResponse.json();
+
+            if (statusData.ok && statusData.response) {
+              setLogs((prev) => [...prev, 'Payment status retrieved successfully']);
+
+              // Update summary with payment status data
+              const enrichedResult = {
+                ...combinedResult,
+                summary: {
+                  ...combinedResult.summary,
+                  transactionStatus: statusData.response.transactionStatus,
+                  transactionType: statusData.response.transactionType,
+                  paymentStatusDetails: statusData.response,
+                }
+              };
+              setResponse(enrichedResult);
+            }
+          } catch (error: any) {
+            setLogs((prev) => [...prev, `Note: Could not fetch payment status: ${error.message}`]);
+            // Don't fail the entire flow if payment status fetch fails
+          }
+        }
       } catch (error: any) {
         setLoading(false);
         const errorMsg = error?.message || 'APM payment failed';
@@ -4002,19 +4161,64 @@ export default function Home() {
                   ))}
                   {response.summary && (
                     <div style={{
-                      border: "1px solid " + primaryPurple,
-                      borderRadius: "8px",
                       padding: "1rem",
-                      backgroundColor: nightMode ? "#2a1a25" : "#fef7ff"
+                      marginTop: "1.25rem",
+                      borderTop: `1px solid ${THEMES[apiResponseTheme]?.border || (nightMode ? "#444" : "#ddd")}`
                     }}>
-                      <h4 style={{
-                        color: primaryPurple,
-                        fontSize: "0.9375rem",
-                        fontWeight: 600,
-                        margin: "0 0 0.75rem 0"
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '0.75rem'
                       }}>
-                        Summary
-                      </h4>
+                        <h4 style={{
+                          color: primaryPurple,
+                          fontSize: "0.9375rem",
+                          fontWeight: 600,
+                          margin: 0
+                        }}>
+                          Summary
+                        </h4>
+                        {completeFlowSessionToken && (
+                          <button
+                            onClick={refreshPaymentStatus}
+                            disabled={loading}
+                            style={{
+                              background: loading ? '#e0e0e0' : `linear-gradient(135deg, ${primaryPurple} 0%, #9333ea 100%)`,
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              opacity: loading ? 0.6 : 1,
+                              padding: '0.5rem',
+                              width: '36px',
+                              height: '36px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ffffff',
+                              fontSize: '1.25rem',
+                              transition: 'all 0.2s',
+                              boxShadow: loading ? 'none' : '0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)',
+                              transform: 'translateY(0)',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loading) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 6px 8px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!loading) {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)';
+                              }
+                            }}
+                            title="Refresh payment status"
+                          >
+                            ↻
+                          </button>
+                        )}
+                      </div>
                       <div style={{
                         background: "transparent",
                         color: THEMES[apiResponseTheme]?.text || (nightMode ? "#e0e0e0" : textDark),
